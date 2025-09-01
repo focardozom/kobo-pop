@@ -41,7 +41,7 @@
         <button class="btn" id="btnPause" disabled>Pause</button>
         <button class="btn" id="btnReset">Reset</button>
         <div class="timer-chip" id="status" aria-live="polite">
-          Popup in: <span id="count">60</span>s
+          Instantánea en: <span id="count">60</span>s
         </div>
       </div>
     </header>
@@ -75,7 +75,7 @@
 
   <script>
     // === CONFIG ===
-    const POPUP_AFTER_SECONDS = 300; // initial countdown
+    const POPUP_AFTER_SECONDS = 10; // initial countdown
     const SNOOZE_SECONDS = 300;      // snooze after "Continue"
     const INACTIVITY_MODE = false;  // reset on user activity
     const AUTO_START = false;       // <- set true if you want it to run on load
