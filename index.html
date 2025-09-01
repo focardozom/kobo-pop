@@ -2,13 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Survey with Timed Pop-ups + Controls</title>
+  <title>Encuesta Figura 01</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root { --brand:#2563eb; --bg:#0f172a; --fg:#e2e8f0; }
     html,body{height:100%;margin:0;background:#0b1220;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg)}
     .wrap{max-width:1100px;margin:0 auto;padding:1rem}
     header{position:sticky;top:0;background:var(--bg);z-index:100;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem;padding:.5rem 0 1rem;border-bottom:1px solid #1f2937}
+    .logo-title{display:flex;align-items:center;gap:.5rem}
+    .logo{height:2rem;width:auto;border-radius:4px;background-color:#ffffff;padding:0.25rem}
     header h1{font-size:1.1rem;margin:0;opacity:.9}
     .controls{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
     .timer-chip{font-size:.9rem;background:#111827;color:#cbd5e1;padding:.35rem .6rem;border:1px solid #1f2937;border-radius:999px}
@@ -29,7 +31,10 @@
 <body>
   <div class="wrap">
     <header>
-      <h1>Course Survey</h1>
+      <div class="logo-title">
+        <img src="logo.png" alt="Logo" class="logo">
+        <h1>Encuesta Colegios</h1>
+      </div>
 
       <div class="controls" role="group" aria-label="Timer controls">
         <button class="btn btn-primary" id="btnStart">Start</button>
@@ -45,7 +50,7 @@
       <iframe
         id="surveyFrame"
         title="KoBo Survey"
-        src="https://ee.kobotoolbox.org/x/27ZH7XRq"
+        src="https://ee.kobotoolbox.org/i/27ZH7XRq"
         allow="geolocation *; camera *; microphone *"
         referrerpolicy="no-referrer-when-downgrade">
       </iframe>
@@ -56,7 +61,7 @@
   <div class="modal-backdrop" id="backdrop" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <header>
-        <h2 id="modalTitle">Es hora de tomar otra instantánea ✨</h2>
+        <h2 id="modalTitle">Es hora de tomar otra instantánea 📷</h2>
       </header>
       <div class="content" id="modalBody">
         Por favor, agrega una nueva instantánea. Haz click en el "+" para continuar.
@@ -70,8 +75,8 @@
 
   <script>
     // === CONFIG ===
-    const POPUP_AFTER_SECONDS = 10; // initial countdown
-    const SNOOZE_SECONDS = 90;      // snooze after "Continue"
+    const POPUP_AFTER_SECONDS = 300; // initial countdown
+    const SNOOZE_SECONDS = 300;      // snooze after "Continue"
     const INACTIVITY_MODE = false;  // reset on user activity
     const AUTO_START = false;       // <- set true if you want it to run on load
 
