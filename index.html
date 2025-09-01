@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Survey with Timed Pop-ups + Controls</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --brand:#2563eb; --bg:#0f172a; --fg:#e2e8f0; }
+    html,body{height:100%;margin:0;background:#0b1220;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg)}
+    .wrap{max-width:1100px;margin:0 auto;padding:1rem}
+    header{position:sticky;top:0;background:var(--bg);z-index:100;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem;padding:.5rem 0 1rem;border-bottom:1px solid #1f2937}
+    header h1{font-size:1.1rem;margin:0;opacity:.9}
+    .controls{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+    .timer-chip{font-size:.9rem;background:#111827;color:#cbd5e1;padding:.35rem .6rem;border:1px solid #1f2937;border-radius:999px}
+    .btn{border:1px solid #334155;background:#0b1220;color:#e5e7eb;border-radius:999px;padding:.45rem .8rem;font-weight:600;cursor:pointer}
+    .btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .frame-box{aspect-ratio:9/14;width:100%;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4);border:1px solid #1f2937}
+    iframe{width:100%;height:100%;border:0;background:white}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,.65);display:none;align-items:center;justify-content:center;padding:1rem;z-index:9999}
+    .modal{width:min(560px,92vw);background:#0b1328;border:1px solid #1f2a4a;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.5);overflow:hidden}
+    .modal header{padding:1rem 1.25rem;background:#0e1730;border-bottom:1px solid #1f2a4a}
+    .modal header h2{margin:0;font-size:1.1rem}
+    .modal .content{padding:1rem 1.25rem;line-height:1.5}
+    .modal .actions{display:flex;gap:.6rem;justify-content:flex-end;padding:1rem 1.25rem;background:#0e1730;border-top:1px solid #1f2a4a}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Course Survey</h1>
+
+      <div class="controls" role="group" aria-label="Timer controls">
+        <button class="btn btn-primary" id="btnStart">Start</button>
+        <button class="btn" id="btnPause" disabled>Pause</button>
+        <button class="btn" id="btnReset">Reset</button>
+        <div class="timer-chip" id="status" aria-live="polite">
+          Popup in: <span id="count">60</span>s
+        </div>
+      </div>
+    </header>
+
+    <div class="frame-box" role="region" aria-label="Survey form">
+      <iframe
+        id="surveyFrame"
+        title="KoBo Survey"
+        src="https://ee.kobotoolbox.org/x/27ZH7XRq"
+        allow="geolocation *; camera *; microphone *"
+        referrerpolicy="no-referrer-when-downgrade">
+      </iframe>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-backdrop" id="backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header>
+        <h2 id="modalTitle">Es hora de tomar otra instantánea ✨</h2>
+      </header>
+      <div class="content" id="modalBody">
+        Por favor, agrega una nueva instantánea. Haz click en el "+" para continuar.
+      </div>
+      <div class="actions">
+        <button class="btn" id="dismissOnce">Got it</button>
+        <button class="btn btn-primary" id="dismissAndSnooze">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // === CONFIG ===
+    const POPUP_AFTER_SECONDS = 10; // initial countdown
+    const SNOOZE_SECONDS = 90;      // snooze after "Continue"
+    const INACTIVITY_MODE = false;  // reset on user activity
+    const AUTO_START = false;       // <- set true if you want it to run on load
+
+    // === STATE ===
+    let remaining = POPUP_AFTER_SECONDS;
+    let intervalId = null;
+    let paused = true;
+
+    const countEl = document.getElementById('count');
+    const btnStart = document.getElementById('btnStart');
+    const btnPause = document.getElementById('btnPause');
+    const btnReset = document.getElementById('btnReset');
+    const backdrop = document.getElementById('backdrop');
+    const dismissOnce = document.getElementById('dismissOnce');
+    const dismissAndSnooze = document.getElementById('dismissAndSnooze');
+
+    // Activity listeners (outside iframe)
+    const activityEvents = ['mousemove', 'keydown', 'touchstart', 'scroll'];
+    activityEvents.forEach(evt => {
+      window.addEventListener(evt, () => {
+        if (!INACTIVITY_MODE || paused) return;
+        resetTimer(POPUP_AFTER_SECONDS); // treat any activity as "inactivity timer restart"
+      }, { passive: true });
+    });
+
+    function startTimer() {
+      if (!paused) return;
+      paused = false;
+      btnPause.textContent = 'Pause';
+      btnPause.disabled = false;
+      btnStart.textContent = 'Restart';
+      stopInterval();
+      intervalId = setInterval(tick, 1000);
+    }
+
+    function stopInterval() {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = null;
+    }
+
+    function pauseTimer() {
+      if (paused) { // resume
+        startTimer();
+      } else {
+        paused = true;
+        btnPause.textContent = 'Resume';
+        stopInterval();
+      }
+    }
+
+    function resetTimer(seconds = POPUP_AFTER_SECONDS) {
+      remaining = seconds;
+      countEl.textContent = remaining;
+    }
+
+    function tick() {
+      remaining -= 1;
+      countEl.textContent = Math.max(remaining, 0);
+      if (remaining <= 0) {
+        showModal();
+        paused = true;
+        btnPause.textContent = 'Resume';
+        stopInterval();
+      }
+    }
+
+    function showModal() {
+      backdrop.style.display = 'flex';
+      backdrop.setAttribute('aria-hidden', 'false');
+    }
+    function hideModal() {
+      backdrop.style.display = 'none';
+      backdrop.setAttribute('aria-hidden', 'true');
+    }
+
+    // Buttons
+    btnStart.addEventListener('click', () => {
+      resetTimer();   // restart from initial value
+      startTimer();   // begin countdown
+    });
+
+    btnPause.addEventListener('click', pauseTimer);
+
+    btnReset.addEventListener('click', () => {
+      paused = true;
+      btnPause.textContent = 'Pause';
+      btnPause.disabled = true;
+      btnStart.textContent = 'Start';
+      stopInterval();
+      resetTimer();   // reset but do not start
+    });
+
+    dismissOnce.addEventListener('click', () => {
+      hideModal();
+      // Do not restart automatically
+    });
+
+    dismissAndSnooze.addEventListener('click', () => {
+      hideModal();
+      resetTimer(SNOOZE_SECONDS);
+      startTimer();
+    });
+
+    // Page visibility
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopInterval();
+      } else if (!paused) {
+        startTimer();
+      }
+    });
+
+    // Init
+    resetTimer(POPUP_AFTER_SECONDS);
+    if (AUTO_START) startTimer();
+  </script>
+</body>
+</html>
