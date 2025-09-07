@@ -28,6 +28,8 @@
     .modal header h2{margin:0;font-size:1.1rem}
     .modal .content{padding:1rem 1.25rem;line-height:1.5}
     .modal .actions{display:flex;gap:.6rem;justify-content:space-between;padding:1rem 1.25rem;background:#0e1730;border-top:1px solid #1f2a4a}
+    .camera-flash{animation:flash 2s infinite ease-in-out}
+    @keyframes flash{0%,100%{opacity:1} 50%{opacity:0.3}}
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   </style>
 </head>
@@ -44,7 +46,7 @@
         <button class="btn" id="pauseBtn" disabled>Pausar</button>
         <button class="btn" id="resetBtn">Reiniciar</button>
         <div class="timer-chip" id="status" aria-live="polite">
-          <span id="count">60</span>
+          <span id="count">300</span>
         </div>
       </div>
     </header>
@@ -65,7 +67,7 @@
   <div class="modal-backdrop" id="backdrop" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <header>
-        <h2 id="modalTitle">Es hora de tomar otra instantánea 📷</h2>
+        <h2 id="modalTitle">Es hora de tomar otra instantánea <span class="camera-flash">📷</span></h2>
       </header>
       <div class="content" id="modalBody">
         Por favor, agrega una nueva instantánea. Haz click en el "+" para continuar.
