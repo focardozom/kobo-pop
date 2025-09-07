@@ -14,8 +14,11 @@
     header h1{font-size:1.1rem;margin:0;opacity:.9}
     .controls{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
     .timer-chip{font-size:.9rem;background:#111827;color:#cbd5e1;padding:.35rem .6rem;border:1px solid #1f2937;border-radius:999px}
-    .btn{border:1px solid #334155;background:#0b1220;color:#e5e7eb;border-radius:999px;padding:.45rem .8rem;font-weight:600;cursor:pointer}
+    .btn{border:1px solid #334155;background:#0b1220;color:#e5e7eb;border-radius:999px;padding:.45rem .8rem;font-weight:600;cursor:pointer;transition:all 0.2s ease}
+    .btn:hover:not(:disabled){background:#1e293b;border-color:#475569}
     .btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
+    .btn-primary:hover:not(:disabled){background:#1d4ed8;border-color:#1d4ed8}
+    .btn-large{padding:.7rem 1.5rem;font-size:1.1rem;min-width:120px}
     .btn:disabled{opacity:.5;cursor:not-allowed}
     .frame-box{aspect-ratio:9/14;width:100%;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4);border:1px solid #1f2937}
     iframe{width:100%;height:100%;border:0;background:white}
@@ -24,7 +27,7 @@
     .modal header{padding:1rem 1.25rem;background:#0e1730;border-bottom:1px solid #1f2a4a}
     .modal header h2{margin:0;font-size:1.1rem}
     .modal .content{padding:1rem 1.25rem;line-height:1.5}
-    .modal .actions{display:flex;gap:.6rem;justify-content:flex-end;padding:1rem 1.25rem;background:#0e1730;border-top:1px solid #1f2a4a}
+    .modal .actions{display:flex;gap:.6rem;justify-content:space-between;padding:1rem 1.25rem;background:#0e1730;border-top:1px solid #1f2a4a}
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   </style>
 </head>
@@ -37,11 +40,11 @@
       </div>
 
       <div class="controls" role="group" aria-label="Timer controls">
-        <button class="btn btn-primary" id="btnStart">Start</button>
-        <button class="btn" id="btnPause" disabled>Pause</button>
-        <button class="btn" id="btnReset">Reset</button>
+        <button class="btn btn-primary btn-large" id="startBtn">Iniciar</button>
+        <button class="btn" id="pauseBtn" disabled>Pausar</button>
+        <button class="btn" id="resetBtn">Reiniciar</button>
         <div class="timer-chip" id="status" aria-live="polite">
-          Instantánea en: <span id="count">60</span>s
+          <span id="count">60</span>
         </div>
       </div>
     </header>
@@ -50,11 +53,12 @@
       <iframe
         id="surveyFrame"
         title="KoBo Survey"
-        src="https://ee.kobotoolbox.org/i/27ZH7XRq"
+        src="https://ee.kobotoolbox.org/x/27ZH7XRq"
         allow="geolocation *; camera *; microphone *"
         referrerpolicy="no-referrer-when-downgrade">
       </iframe>
     </div>
+
   </div>
 
   <!-- Modal -->
@@ -67,49 +71,103 @@
         Por favor, agrega una nueva instantánea. Haz click en el "+" para continuar.
       </div>
       <div class="actions">
-        <button class="btn" id="dismissOnce">Got it</button>
-        <button class="btn btn-primary" id="dismissAndSnooze">Continue</button>
+        <button class="btn" id="dismissOnce">Ya finalizó la clase</button>
+        <button class="btn btn-primary" id="dismissAndSnooze">Reiniciar conteo</button>
       </div>
     </div>
   </div>
 
   <script>
     // === CONFIG ===
-    const POPUP_AFTER_SECONDS = 10; // initial countdown
+    const POPUP_AFTER_SECONDS = 10; // countdown duration
     const SNOOZE_SECONDS = 300;      // snooze after "Continue"
-    const INACTIVITY_MODE = false;  // reset on user activity
-    const AUTO_START = false;       // <- set true if you want it to run on load
 
     // === STATE ===
     let remaining = POPUP_AFTER_SECONDS;
     let intervalId = null;
-    let paused = true;
+    let timerStarted = false;
+    let timerStartTime = null;
+    let lastVisibleTime = null;
 
-    const countEl = document.getElementById('count');
-    const btnStart = document.getElementById('btnStart');
-    const btnPause = document.getElementById('btnPause');
-    const btnReset = document.getElementById('btnReset');
-    const backdrop = document.getElementById('backdrop');
-    const dismissOnce = document.getElementById('dismissOnce');
-    const dismissAndSnooze = document.getElementById('dismissAndSnooze');
+     const countEl = document.getElementById('count');
+     const startBtn = document.getElementById('startBtn');
+     const pauseBtn = document.getElementById('pauseBtn');
+     const resetBtn = document.getElementById('resetBtn');
+     const backdrop = document.getElementById('backdrop');
+     const dismissOnce = document.getElementById('dismissOnce');
+     const dismissAndSnooze = document.getElementById('dismissAndSnooze');
 
-    // Activity listeners (outside iframe)
-    const activityEvents = ['mousemove', 'keydown', 'touchstart', 'scroll'];
-    activityEvents.forEach(evt => {
-      window.addEventListener(evt, () => {
-        if (!INACTIVITY_MODE || paused) return;
-        resetTimer(POPUP_AFTER_SECONDS); // treat any activity as "inactivity timer restart"
-      }, { passive: true });
-    });
+    // === PERSISTENT TIMER FUNCTIONS ===
+    function saveTimerState() {
+      const timerState = {
+        remaining: remaining,
+        timerStarted: timerStarted,
+        timerStartTime: timerStartTime,
+        lastVisibleTime: Date.now()
+      };
+      localStorage.setItem('popKoboTimer', JSON.stringify(timerState));
+    }
+
+    function loadTimerState() {
+      try {
+        const saved = localStorage.getItem('popKoboTimer');
+        if (saved) {
+          const timerState = JSON.parse(saved);
+          remaining = timerState.remaining;
+          timerStarted = timerState.timerStarted;
+          timerStartTime = timerState.timerStartTime;
+          lastVisibleTime = timerState.lastVisibleTime;
+          
+          // Calculate elapsed time since last visibility
+          if (timerStarted && timerStartTime && lastVisibleTime) {
+            const now = Date.now();
+            const elapsedSeconds = Math.floor((now - lastVisibleTime) / 1000);
+            remaining = Math.max(0, remaining - elapsedSeconds);
+            
+            // Update UI
+            countEl.textContent = remaining;
+            
+            // If timer should have finished, show modal
+            if (remaining <= 0) {
+              showModal();
+              timerStarted = false;
+              stopInterval();
+              
+              // Reset button states
+              startBtn.disabled = false;
+              pauseBtn.disabled = true;
+              pauseBtn.textContent = 'Pausar';
+            } else {
+              // Resume timer if it was running and still has time
+              timerStarted = true;
+              intervalId = setInterval(tick, 1000);
+              
+              // Update button states
+              startBtn.disabled = true;
+              pauseBtn.disabled = false;
+              pauseBtn.textContent = 'Pausar';
+            }
+          }
+          
+          return true;
+        }
+      } catch (error) {
+        console.log('Could not load timer state:', error);
+      }
+      return false;
+    }
+
+
+
 
     function startTimer() {
-      if (!paused) return;
-      paused = false;
-      btnPause.textContent = 'Pause';
-      btnPause.disabled = false;
-      btnStart.textContent = 'Restart';
+      if (timerStarted) return;
+      timerStarted = true;
+      timerStartTime = Date.now();
+      lastVisibleTime = Date.now();
       stopInterval();
       intervalId = setInterval(tick, 1000);
+      saveTimerState();
     }
 
     function stopInterval() {
@@ -117,29 +175,56 @@
       intervalId = null;
     }
 
-    function pauseTimer() {
-      if (paused) { // resume
-        startTimer();
-      } else {
-        paused = true;
-        btnPause.textContent = 'Resume';
-        stopInterval();
-      }
-    }
-
     function resetTimer(seconds = POPUP_AFTER_SECONDS) {
       remaining = seconds;
       countEl.textContent = remaining;
+      timerStarted = false;
+      timerStartTime = null;
+      lastVisibleTime = null;
+      stopInterval();
+      saveTimerState();
+      console.log('Timer reset to', seconds, 'seconds');
     }
+
+    // Function to clear all timer state (useful for testing)
+    function clearTimerState() {
+      localStorage.removeItem('popKoboTimer');
+      console.log('Timer state cleared from localStorage');
+    }
+
+    // Test function to verify timer functionality
+    function testTimer() {
+      console.log('=== TIMER TEST ===');
+      console.log('Current state:', {
+        remaining: remaining,
+        timerStarted: timerStarted,
+        timerStartTime: timerStartTime,
+        lastVisibleTime: lastVisibleTime
+      });
+      console.log('Saved state:', localStorage.getItem('popKoboTimer'));
+      console.log('==================');
+    }
+
+    // Make test functions available globally for debugging
+    window.testTimer = testTimer;
+    window.clearTimerState = clearTimerState;
 
     function tick() {
       remaining -= 1;
       countEl.textContent = Math.max(remaining, 0);
+      lastVisibleTime = Date.now();
+      saveTimerState();
+      
       if (remaining <= 0) {
         showModal();
-        paused = true;
-        btnPause.textContent = 'Resume';
+        timerStarted = false;
         stopInterval();
+        saveTimerState();
+        
+        // Reset button states
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        pauseBtn.textContent = 'Pausar';
       }
     }
 
@@ -152,22 +237,6 @@
       backdrop.setAttribute('aria-hidden', 'true');
     }
 
-    // Buttons
-    btnStart.addEventListener('click', () => {
-      resetTimer();   // restart from initial value
-      startTimer();   // begin countdown
-    });
-
-    btnPause.addEventListener('click', pauseTimer);
-
-    btnReset.addEventListener('click', () => {
-      paused = true;
-      btnPause.textContent = 'Pause';
-      btnPause.disabled = true;
-      btnStart.textContent = 'Start';
-      stopInterval();
-      resetTimer();   // reset but do not start
-    });
 
     dismissOnce.addEventListener('click', () => {
       hideModal();
@@ -178,20 +247,76 @@
       hideModal();
       resetTimer(SNOOZE_SECONDS);
       startTimer();
+      
+      // Update button states
+      startBtn.disabled = true;
+      pauseBtn.disabled = false;
+      pauseBtn.textContent = 'Pausar';
     });
 
-    // Page visibility
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        stopInterval();
-      } else if (!paused) {
+    // Button event listeners
+    startBtn.addEventListener('click', () => {
+      if (!timerStarted) {
         startTimer();
+        startBtn.disabled = true;
+        pauseBtn.disabled = false;
+        pauseBtn.textContent = 'Pausar';
       }
     });
 
+    pauseBtn.addEventListener('click', () => {
+      if (timerStarted) {
+        // Pause the timer
+        timerStarted = false;
+        stopInterval();
+        pauseBtn.textContent = 'Reanudar';
+        saveTimerState();
+      } else {
+        // Resume the timer
+        timerStarted = true;
+        timerStartTime = Date.now() - (POPUP_AFTER_SECONDS - remaining) * 1000;
+        lastVisibleTime = Date.now();
+        intervalId = setInterval(tick, 1000);
+        pauseBtn.textContent = 'Pausar';
+        saveTimerState();
+      }
+    });
+
+    resetBtn.addEventListener('click', () => {
+      resetTimer();
+      startBtn.disabled = false;
+      pauseBtn.disabled = true;
+      pauseBtn.textContent = 'Pausar';
+    });
+
+    // Page visibility - handle persistent timer
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // Page is hidden - save current state
+        saveTimerState();
+        stopInterval();
+      } else {
+        // Page is visible - load and resume timer
+        if (loadTimerState()) {
+          console.log('Timer state restored from localStorage');
+        }
+      }
+    });
+
+    // Save state when user navigates away
+    window.addEventListener('beforeunload', () => {
+      saveTimerState();
+    });
+
     // Init
-    resetTimer(POPUP_AFTER_SECONDS);
-    if (AUTO_START) startTimer();
+    console.log('Initializing timer...');
+    if (!loadTimerState()) {
+      // No saved state found, initialize with defaults
+      console.log('No saved timer state found, initializing with defaults');
+      resetTimer(POPUP_AFTER_SECONDS);
+    } else {
+      console.log('Timer state loaded from localStorage');
+    }
   </script>
 </body>
 </html>
